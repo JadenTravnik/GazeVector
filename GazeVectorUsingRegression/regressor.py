@@ -9,7 +9,7 @@ def regressTest(original, target, test, numTargetCols):
 	numFrames = len(test)
 
 	linReg = LinReg(fit_intercept=True)
-
+	
 	predictedThings = linReg.fit(original, target).predict(test)
 	predictedThings = predictedThings.reshape(numFrames, numTargetCols)
 	
@@ -19,14 +19,18 @@ def regressTest(original, target, test, numTargetCols):
 
 
 # Cluster2d takes in a 2*n array and a number of requested clusters and finds temporal clusters (see the documentation for Cluster3d)
-def Cluster2D(a, numClusters=6):
+def Cluster2D(a, numClusters=6, maxThreshold=0.05, minThreshold=0.01):
 	# split the array into 2*numClusters
 	a = np.array_split(a, numClusters*2, axis=0)
 
+	clusterThreshold = len(a)/(numClusters*4)
+
+
 	clusters = []
 	for span in a: # for each section of time, find a group of clusters using the default values in Cluster2DwithTime
-		clusters += Cluster2DwithTime(span)
+		clusters += Cluster2DwithTime(span, maxThreshold=maxThreshold, minThreshold=minThreshold, clusterThreshold=clusterThreshold)
 
+	print('lenClusters: ' + str(len(clusters)))
 	# after finding all cluster candidates, while the number of clusters is greater than the number desired
 	while len(clusters) > numClusters:
 		iSpl = NextToMerge(clusters) # get the index to merge, this is the cluster with the minimum distance to the next one
@@ -66,7 +70,7 @@ def NextToMerge(clusters):
 
 
 
-def Cluster2DwithTime(a, maxThreshold=0.05, minThreshold=0.01, clusterThreshold=300):
+def Cluster2DwithTime(a, maxThreshold, minThreshold, clusterThreshold):
 	# initialize the first cluster with the first point
 	clusters = [a[0]]
 	clusterNums = [1]
@@ -81,16 +85,22 @@ def Cluster2DwithTime(a, maxThreshold=0.05, minThreshold=0.01, clusterThreshold=
 	for i in range(len(a)):
 		# for the next point in a
 		p = a[i]
-		# if the point is close enough to the current cluster
-		if np.linalg.norm(p-clusters[c]) <= maxThreshold:
-			# merge it with the cluster and add increase the count of the number of points in the cluster
-			clusters[c], clusterNums[c] = avgCluster(clusters[c], p, clusterNums[c])
-			clusterNums[c] += 1
-		# only if the point is in really close to the next one is it considered as the start of a new cluster, this eliminates outliers
-		elif np.linalg.norm(p-a[i+1]) <= minThreshold:
-			clusters.append(p)
-			clusterNums.append(1)
-			c += 1
+
+		try:
+			# if the point is close enough to the current cluster
+			if np.linalg.norm(p-clusters[c]) <= maxThreshold:
+				# merge it with the cluster and add increase the count of the number of points in the cluster
+				clusters[c], clusterNums[c] = avgCluster(clusters[c], p, clusterNums[c])
+				clusterNums[c] += 1
+				# only if the point is in really close to the next one is it considered as the start of a new cluster, this eliminates outliers
+
+			elif np.linalg.norm(p-a[i+1]) <= minThreshold:
+				clusters.append(p)
+				clusterNums.append(1)
+				c += 1
+
+		except:
+			pass
 
 	# eliminate any clusters with less than the clusterThreshold
 	goodClusters = []

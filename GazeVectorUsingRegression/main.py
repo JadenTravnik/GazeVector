@@ -16,24 +16,25 @@ DlabDataFileName = sys.argv[2]
 
 # The measured eye offset in mm
 eyeOffsetLeft = [50, 60, -30]
-eyeOffsetRight = [50, 60, -80]
+eyeOffsetRight = [50, 60, -88]
 
 # Get a dictionary of points from the vicon file
 points = parseViconFile(ViconDataFileName)
 
 # Put the arrays into their variables.
-rForehead, rTemple, lForehead, lTemple = points['Head:RForeHead'], points['Head:RTemple'], points['Head:LForeHead'], points['Head:LTemple']
+rForehead, rTemple, lForehead, lTemple = points['Dikablis:Head1'], points['Dikablis:Head2'], points['Dikablis:Head3'], points['Dikablis:Head4']
 
 # There may be more of these points, so lets just add all of the calibration points we can
 CalibrationPoints = []
-calibrationNum = 0
-while True:
-	try:
-		calibrationNum += 1 # This only works if there is a a rigid body in Vicon called the CalibrationPlane, this will need to be renamed if that changes
-		CalibrationPoints.append(points['CalibrationPane:DLabCal' + str(calibrationNum)])
-	except:
-		calibrationNum -= 1
-		break
+calibrationNum = 1
+CalibrationPoints.append(points['Wand:Tip'])
+#while True:
+# 	try:
+# 		calibrationNum += 1 # This only works if there is a a rigid body in Vicon called the CalibrationPlane, this will need to be renamed if that changes
+# 		CalibrationPoints.append(points['CalibrationPane:DLabCal' + str(calibrationNum)])
+# 	except:
+# 		calibrationNum -= 1
+# 		break
 
 print('Parsed Vicon Data')
 
@@ -41,8 +42,8 @@ print('Parsed Vicon Data')
 DlabEyeDataLeft, DlabEyeDataRight = parseDLabData(DlabDataFileName, len(rForehead))
 
 headAngles, focusPoints, eyePosLeft, eyePosRight = [], [], [], []
-anglesLeft = [[] for i in range(calibrationNum)]
-anglesRight = [[] for i in range(calibrationNum)]
+anglesLeft = []#[[] for i in range(calibrationNum)]
+anglesRight = []#[[] for i in range(calibrationNum)]
 
 numFrames = len(rForehead)
 
@@ -60,44 +61,71 @@ for i in range(numFrames):
 	eyePosRightTemp = calcEyePosition(lForehead[i], rForehead[i], rTemple[i], eyeOffsetRight)
 
 	# calcualte the sphereical angles that would have given a perfect gaze vector
-	for j in range(calibrationNum):
-		anglesLeft[j].append(calcAngle(eyePosLeftTemp, headDirectionTemp, CalibrationPoints[j][i]))
-		anglesRight[j].append(calcAngle(eyePosRightTemp, headDirectionTemp, CalibrationPoints[j][i]))
+	anglesLeft.append(calcAngle(eyePosLeftTemp, headDirectionTemp, CalibrationPoints[0][i]))
+	anglesRight.append(calcAngle(eyePosRightTemp, headDirectionTemp, CalibrationPoints[0][i]))
+
+	#for j in range(calibrationNum):
+	#	anglesLeft[j].append(calcAngle(eyePosLeftTemp, headDirectionTemp, CalibrationPoints[j][i]))
+	#	anglesRight[j].append(calcAngle(eyePosRightTemp, headDirectionTemp, CalibrationPoints[j][i]))
 
 	headAngles.append(headAnglesTemp)
 	eyePosLeft.append(eyePosLeftTemp)
 	eyePosRight.append(eyePosRightTemp)
 
-
 print('Parsed')
+
+headAngles = np.array(headAngles).reshape(numFrames, 2)
+anglesLeft = np.array(anglesLeft).reshape(numFrames, 2)
+anglesRight = np.array(anglesRight).reshape(numFrames, 2)
+
+
 print('Finding Clusters')
 
 # find a mean for the angles
-anglesLeft = [np.mean(np.array(angles).reshape(numFrames,2), axis=0).tolist() for angles in anglesLeft]
-anglesRight = [np.mean(np.array(angles).reshape(numFrames,2), axis=0).tolist() for angles in anglesRight]
+#anglesLeft = [np.mean(np.array(angles).reshape(numFrames,2), axis=0).tolist() for angles in anglesLeft]
+#anglesRight = [np.mean(np.array(angles).reshape(numFrames,2), axis=0).tolist() for angles in anglesRight]
 
 # use the average to calculate the first and last clusters
-anglesLeft.append(np.mean(anglesLeft, axis=0))
-anglesLeft = [anglesLeft[-1]] + anglesLeft
+#anglesLeft.append(np.mean(anglesLeft, axis=0))
+#anglesLeft = [anglesLeft[-1]] + anglesLeft
 
-anglesRight.append(np.mean(anglesRight, axis=0))
-anglesRight = [anglesRight[-1]] + anglesRight
+#anglesRight.append(np.mean(anglesRight, axis=0))
+#anglesRight = [anglesRight[-1]] + anglesRight
 
 # If you get an error here about: ValueError: total size of new array must be unchanged,
 # look at line 32
-anglesLeft = np.array(anglesLeft).reshape(6, 2)
-anglesRight = np.array(anglesRight).reshape(6, 2)
+#anglesLeft = np.array(anglesLeft).reshape(len(anglesLeft), 2)
+#anglesRight = np.array(anglesRight).reshape(len(anglesRight), 2)
+
+print(anglesLeft.shape)
+
+oldAnglesLeft = anglesLeft[:]
+oldAnglesRight = anglesRight[:]
+
+anglesLeft = Cluster2D(anglesLeft, numClusters=20, maxThreshold=0.2, minThreshold=0.05)
+anglesRight = Cluster2D(anglesRight, numClusters=20, maxThreshold=0.2, minThreshold=0.05)
 
 # calcuate the focus points from the Dlab data
-leftClusters = Cluster2D(DlabEyeDataLeft, numClusters=6)
-rightClusters = Cluster2D(DlabEyeDataRight, numClusters=6)
+leftClusters = Cluster2D(DlabEyeDataLeft, numClusters=20)
+rightClusters = Cluster2D(DlabEyeDataRight, numClusters=20)
 
 print('Found Clusters')
 print('Running Regression')
 
-# run a linear regression on the 6 clusters and predict the angles given the dlab data
-newLeft = regressTest(leftClusters, anglesLeft, DlabEyeDataLeft, 2)
-newRight = regressTest(rightClusters, anglesRight, DlabEyeDataRight, 2)
+# run a linear regression on the clusters and predict the angles given the dlab data
+newLeft = regressTest(oldAnglesLeft, DlabEyeDataLeft, DlabEyeDataLeft, 2)
+newRight = regressTest(oldAnglesLeft, DlabEyeDataRight, DlabEyeDataRight, 2)
+
+plt.plot(DlabEyeDataLeft[:,0],DlabEyeDataLeft[:,1])
+plt.plot(leftClusters[:,0],leftClusters[:,1])
+
+plt.plot(anglesLeft[:,0],anglesLeft[:,1])
+plt.plot(oldAnglesLeft[:,0], oldAnglesLeft[:,1])
+
+plt.plot(headAngles[:,0], headAngles[:,1])
+
+plt.plot(newLeft[:,0],newLeft[:,1])
+plt.show()
 
 leftVector, rightVector, error = [], [], []
 
@@ -136,15 +164,15 @@ error = np.array(error)
 avg = [np.mean(error)]*numFrames
 
 # plot the error
-if True:
-	plt.plot(error, label='Error')
-	plt.plot(avg, label='Avg')
-	plt.ylabel('Distance (mm)')
-	plt.xlabel('Time Step')
-	plt.title('Min distance between Focus Point and Targets')
-	plt.grid(True)
-	plt.legend()
-	plt.axis([0, 3500, 0, 200])
+#if True:
+#	plt.plot(error, label='Error')
+#	plt.plot(avg, label='Avg')
+#	plt.ylabel('Distance (mm)')
+#	plt.xlabel('Time Step')
+#	plt.title('Min distance between Focus Point and Targets')
+#	plt.grid(True)
+#	plt.legend()
+#	plt.axis([0, 3500, 0, 200])
 
 print('Vector Calculation Complete')
 print('Starting Animation')
