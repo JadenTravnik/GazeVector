@@ -23,6 +23,7 @@ def Cluster2D(a, numClusters=6, maxThreshold=0.05, minThreshold=0.01):
 	# split the array into 2*numClusters
 	a = np.array_split(a, numClusters*2, axis=0)
 
+	# magic number (change probably)
 	clusterThreshold = len(a)/(numClusters*4)
 
 
@@ -92,14 +93,15 @@ def Cluster2DwithTime(a, maxThreshold, minThreshold, clusterThreshold):
 				# merge it with the cluster and add increase the count of the number of points in the cluster
 				clusters[c], clusterNums[c] = avgCluster(clusters[c], p, clusterNums[c])
 				clusterNums[c] += 1
-				# only if the point is in really close to the next one is it considered as the start of a new cluster, this eliminates outliers
-
+			
+			# only if the point is in really close to the next one is it considered as the start of a new cluster, this eliminates outliers
 			elif np.linalg.norm(p-a[i+1]) <= minThreshold:
 				clusters.append(p)
 				clusterNums.append(1)
 				c += 1
 
 		except:
+			print('Cluster2DwithTime: Reached end of array')
 			pass
 
 	# eliminate any clusters with less than the clusterThreshold

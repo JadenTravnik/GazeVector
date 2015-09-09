@@ -99,6 +99,14 @@ print('Running Regression')
 newLeft = regressTest(leftClusters, anglesLeft, DlabEyeDataLeft, 2)
 newRight = regressTest(rightClusters, anglesRight, DlabEyeDataRight, 2)
 
+
+plt.plot(leftClusters[:,0],leftClusters[:,1])
+plt.plot(anglesLeft[:,0],anglesLeft[:,1])
+plt.plot(DlabEyeDataLeft[:,0],DlabEyeDataLeft[:,1])
+plt.plot(newLeft[:,0],newLeft[:,1])
+plt.show()
+
+
 leftVector, rightVector, error = [], [], []
 
 print('Regression Complete')

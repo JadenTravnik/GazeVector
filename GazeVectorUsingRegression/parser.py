@@ -25,18 +25,18 @@ def parseDLabData(fileName, viconDataLength):
 				temp = [-changeRange(0, 384, -1, 1, float(row[4])), changeRange(0, 288, -1, 1, float(row[5]))]
 				lastLeft = temp
 			eyeDataLeft.append(temp) # left
-	
-		
 		except:
-			try:
-				if float(row[6]) == 0 or float(row[7]) == 0:
-					temp = lastRight
-				else:
-					temp = [-changeRange(0, 384, -1, 1, float(row[6])), changeRange(0, 288, -1, 1, float(row[7]))]
-					lastRight = temp
-				eyeDataRight.append(temp) # right
-			except:
-				pass
+			pass
+		
+		try:
+			if float(row[6]) == 0 or float(row[7]) == 0:
+				temp = lastRight
+			else:
+				temp = [-changeRange(0, 384, -1, 1, float(row[6])), changeRange(0, 288, -1, 1, float(row[7]))]
+				lastRight = temp
+			eyeDataRight.append(temp) # right
+		except:
+			pass
 
 	numViconFrames = viconDataLength
 
@@ -55,8 +55,12 @@ def parseDLabData(fileName, viconDataLength):
 
 	for i in range(len(eyeDataLeft)):
 		if numExtra != 0 and i%numExtra == 0:
+			try:
 				eyeDataLeftEx.append([eyeDataLeft[i][0], -eyeDataLeft[i][1]])
 				eyeDataRightEx.append([eyeDataRight[i][0], -eyeDataRight[i][1]])
+			except:
+				print('i error: ' + str(i))
+				print(str(len(eyeDataRight)) + '  ' + str(len(eyeDataLeft)))
 		else:
 			for j in range(ratio):
 				# negative Y because its from the point of view of the camera

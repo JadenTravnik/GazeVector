@@ -102,28 +102,35 @@ print(anglesLeft.shape)
 oldAnglesLeft = anglesLeft[:]
 oldAnglesRight = anglesRight[:]
 
-anglesLeft = Cluster2D(anglesLeft, numClusters=20, maxThreshold=0.2, minThreshold=0.05)
-anglesRight = Cluster2D(anglesRight, numClusters=20, maxThreshold=0.2, minThreshold=0.05)
+numClust = 8
+anglesLeft = Cluster2D(anglesLeft, numClusters=numClust, maxThreshold=0.2, minThreshold=0.05)
+anglesRight = Cluster2D(anglesRight, numClusters=numClust, maxThreshold=0.2, minThreshold=0.05)
 
 # calcuate the focus points from the Dlab data
-leftClusters = Cluster2D(DlabEyeDataLeft, numClusters=20)
-rightClusters = Cluster2D(DlabEyeDataRight, numClusters=20)
+leftClusters = Cluster2D(DlabEyeDataLeft, numClusters=numClust)
+rightClusters = Cluster2D(DlabEyeDataRight, numClusters=numClust)
 
 print('Found Clusters')
 print('Running Regression')
 
 # run a linear regression on the clusters and predict the angles given the dlab data
-newLeft = regressTest(oldAnglesLeft, DlabEyeDataLeft, DlabEyeDataLeft, 2)
-newRight = regressTest(oldAnglesLeft, DlabEyeDataRight, DlabEyeDataRight, 2)
+newLeft = regressTest(anglesLeft, leftClusters, DlabEyeDataLeft, 2)
+newRight = regressTest(anglesRight, rightClusters, DlabEyeDataRight, 2)
 
-plt.plot(DlabEyeDataLeft[:,0],DlabEyeDataLeft[:,1])
+#plt.plot(DlabEyeDataLeft[:,0],DlabEyeDataLeft[:,1])
+#plt.plot(leftClusters[:,0],leftClusters[:,1])
+
+#plt.plot(anglesLeft[:,0],anglesLeft[:,1])
+#plt.plot(oldAnglesLeft[:,0], oldAnglesLeft[:,1])
+
+#plt.plot(headAngles[:,0], headAngles[:,1])
+
+#plt.plot(newLeft[:,0],newLeft[:,1])
+
+
 plt.plot(leftClusters[:,0],leftClusters[:,1])
-
 plt.plot(anglesLeft[:,0],anglesLeft[:,1])
-plt.plot(oldAnglesLeft[:,0], oldAnglesLeft[:,1])
-
-plt.plot(headAngles[:,0], headAngles[:,1])
-
+plt.plot(DlabEyeDataLeft[:,0],DlabEyeDataLeft[:,1])
 plt.plot(newLeft[:,0],newLeft[:,1])
 plt.show()
 
