@@ -1,0 +1,44 @@
+function predPos = calcGazeCart(resampVICON,interpDLAB)
+
+X = [resampVICON(:,4:15) interpDLAB(:,2:5)];
+
+predPos = zeros(size(resampVICON,1),3);
+Hd = designfilt('lowpassiir','FilterOrder',14,'HalfPowerFrequency',0.15,'DesignMethod','butter');
+
+for i=1:3
+    predPos(:,i) = calcPos(X,resampVICON(:,i));
+    predPos
+end
+
+figure;
+subplot(3,1,1);
+plot(resampVICON(:,1),'.');
+hold on;
+plot(predPos(:,1),'LineWidth',2); 
+title('X Position Accuracy');
+
+subplot(3,1,2);
+plot(resampVICON(:,2),'.');
+hold on;
+plot(predPos(:,2),'LineWidth',2); 
+title('Y Position Accuracy');
+
+subplot(3,1,3);
+plot(resampVICON(:,3),'.');
+hold on;
+plot(predPos(:,3),'LineWidth',2); 
+title('Z Position Accuracy');
+
+% figure; 
+% plot3(resampVICON(:,1),resampVICON(:,2),resampVICON(:,3));
+% hold on;
+% plot3(predPos(:,1),predPos(:,2),predPos(:,3));
+
+end
+
+% Supplementary Functions
+function predPos = calcPos(X,y)
+    RegTreeTemp = templateTree('Surrogate','On');
+    mdl = fitensemble(X,y,'Bag',60,RegTreeTemp,'type','regression'); 
+    predPos = predict(mdl,X);
+end

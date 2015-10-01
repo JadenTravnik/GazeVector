@@ -60,6 +60,13 @@ for i = 1:size(sliceVICON,2)
     resampVICON(:,i) = resample(sliceVICON(:,i),size(interpDLAB,1),length(sliceVICON(:,1)));
 end
 
+for i = 1:size(resampVICON,2)
+    X = resampVICON(:,i);
+    X(X==0) = NaN;
+    X(isnan(X)) = interp1(find(~isnan(X)), X(~isnan(X)), find(isnan(X)),'pchip');
+    resampVICON(:,i) = X;
+end
+
 clear i;
 
 % saveAndVisualize;

@@ -24,9 +24,7 @@ for i=1:size(resampVICON,1);
     v2 = cross(lForehead(i,:)-rForehead(i,:),v1);
     perpVector = cross(v1,v2);
     headDirection = cross(v1,perpVector);
-    
     headDirection = headDirection / norm(headDirection); % just to make it unit length
-    
     [azimuth,elevation,~] = cart2sph(headDirection(1),headDirection(2),headDirection(3));
     headAngles(i,1:2) = [azimuth elevation];
     
@@ -39,8 +37,8 @@ for i=1:size(resampVICON,1);
 	eyePosRight(i,:) = calcEyePosition(lForehead(i,:), rForehead(i,:), rTemple(i,:), eyeOffsetRight);
     
 %     pass in headAngles rather than recalculating in the function
-    anglesLeft(i,:) = calcAngles(eyePosLeft(i,:), headAngles(i,:), calibrationPoints(i,1:3));
-    anglesRight(i,:) = calcAngles(eyePosRight(i,:), headAngles(i,:), calibrationPoints(i,1:3));
+    anglesLeft(i,:) = calcAngles(eyePosLeft(i,:), headAngles(i,:), calibrationPoints(i,:));
+    anglesRight(i,:) = calcAngles(eyePosRight(i,:), headAngles(i,:), calibrationPoints(i,:));
 end
 
 leftEyeX = interpDLAB(:,2);
@@ -48,49 +46,41 @@ leftEyeY = interpDLAB(:,3);
 rightEyeX = interpDLAB(:,4);
 rightEyeY = interpDLAB(:,5);
 
-diffLeftEyeX = abs(diff(leftEyeX));
-diffLeftEyeY = abs(diff(leftEyeY));
-diffSumLeft = diffLeftEyeX + diffLeftEyeY;
-
-diffRightEyeX = abs(diff(rightEyeX));
-diffRightEyeY = abs(diff(rightEyeY));
-diffSumRight = diffRightEyeX + diffRightEyeY;
+diffSumLeft = abs(diff(leftEyeX)) + abs(diff(leftEyeY));
+diffSumRight = abs(diff(rightEyeX)) + abs(diff(rightEyeY));
 
 makeEyeAnglePupilFigure(anglesLeft,leftEyeX,leftEyeY,anglesRight,rightEyeX,rightEyeY);
-
-% Linear regression on the data to predict the spherical angles
-% given the pupil x/y information from DLAB
 
 % less than the mean of the given signal
 % MAGIC constant
 stabilityConst = mean(diffSumLeft)+mean(diffSumRight);
-stableIDX = (diffSumLeft<stabilityConst)+(diffSumRight<stabilityConst)>1;
+stableIDX = (diffSumLeft<stabilityConst)+(diffSumRight<stabilityConst)>-1;
 
-[pLT,mdlPLT] = modelAndPredictAngle(anglesLeft(:,1),[leftEyeX leftEyeY],stableIDX);
-[pLP,mdlPLP] = modelAndPredictAngle(anglesLeft(:,2),[leftEyeX leftEyeY],stableIDX);
-[pRT,mdlPRT] = modelAndPredictAngle(anglesRight(:,1),[rightEyeX rightEyeY],stableIDX);
-[pRP,mdlPRP] = modelAndPredictAngle(anglesRight(:,2),[rightEyeX rightEyeY],stableIDX);
+[pLT,mdlPLT] = modelAndPredictAngle(anglesLeft(:,1),[leftEyeX leftEyeY rightEyeX rightEyeY],stableIDX);
+
+% [pLTless,mdlPLTless] = modelAndPredictAngle(anglesLeft(:,1),[leftEyeX leftEyeY],stableIDX);
+% figure; 
+% plot(oobLoss(mdlPLT,'mode','cumulative'),'k--'); 
+% hold on; 
+% plot(oobLoss(mdlPLTless,'mode','cumulative'),'r.');
+% title('Relative Error on Bagged Trees for single or both eye data');
+% legend('left and right','only left');
+
+[pLP,mdlPLP] = modelAndPredictAngle(anglesLeft(:,2),[leftEyeX leftEyeY rightEyeX rightEyeY],stableIDX);
+[pRT,mdlPRT] = modelAndPredictAngle(anglesRight(:,1),[leftEyeX leftEyeY rightEyeX rightEyeY],stableIDX);
+[pRP,mdlPRP] = modelAndPredictAngle(anglesRight(:,2),[leftEyeX leftEyeY rightEyeX rightEyeY],stableIDX);
 
 predAnglesLeft = [pLT pLP];
 predAnglesRight = [pRT pRP];
 
+% Filter the data to remove prediction noise
+Hd = designfilt('lowpassiir','FilterOrder',14,'HalfPowerFrequency',0.15,'DesignMethod','butter');
+     
+predAnglesLeft = filtfilt(Hd,predAnglesLeft);
+predAnglesRight = filtfilt(Hd,predAnglesRight);
+
 % % check angle prediction
-makePredictionFigure(predAnglesLeft,anglesLeft,predAnglesRight,anglesRight);
-
-% Eye pupil coordinates on the camera plane recorded by the EyeLink-II 
-% system and positions of the target and head markers collected with the 
-% Vicon system during static and calibration trials were digitally low-pass 
-% filtered at 25 Hz cutoff frequency for EyeLink-II data, and 15 Hz cutoff 
-% frequency for Vicon data; 
-
-% Hd = filterDesign;
-% filtPredAnglesRight = filtfilt(Hd,predAnglesRight(:,2));
-% plot(filtPredAnglesRight);
-
-SSELT = sum((predAnglesLeft(stableIDX,1) - anglesLeft(stableIDX,1)).^2);
-SSELP = sum((predAnglesLeft(stableIDX,2) - anglesLeft(stableIDX,2)).^2);
-SSERT = sum((predAnglesRight(stableIDX,1) - anglesRight(stableIDX,1)).^2);
-SSERP = sum((predAnglesRight(stableIDX,2) - anglesRight(stableIDX,2)).^2);
+[~,~,tM,tSTD] = makePredictionFigure(predAnglesLeft,anglesLeft,predAnglesRight,anglesRight);
 
 leftVector = zeros(size(resampVICON,1),3);
 rightVector = zeros(size(resampVICON,1),3);
@@ -113,14 +103,12 @@ allData.anglesLeft = anglesLeft;
 allData.anglesRight = anglesRight;
 allData.predAnglesLeft = predAnglesLeft;
 allData.predAnglesRight = predAnglesRight;
-allData.SSELT = SSELT;
-allData.SSELP = SSELP;
-allData.SSERT = SSERT;
-allData.SSERP = SSERP;
 allData.mdlPLT = mdlPLT;
 allData.mdlPLP = mdlPLP;
 allData.mdlPRT = mdlPRT;
 allData.mdlPRP = mdlPRP;
+allData.tM = tM;
+allData.tSTD = tSTD;
 
 %% Supplementary Functions
 
@@ -133,8 +121,8 @@ end
 
 function angles = calcAngles(eyePos, headAngles, target) 
     eyeTargetVec = target-eyePos;
-    eyeTargetAngles = cart2sph(eyeTargetVec(1),eyeTargetVec(2),eyeTargetVec(3));
-    angles = eyeTargetAngles - headAngles;
+    [az,el,~] = cart2sph(eyeTargetVec(1),eyeTargetVec(2),eyeTargetVec(3));
+    angles = [az - headAngles(1), el - headAngles(2)];
 end
 
 function vecN = changeRange(oldMin, oldMax, newMin, newMax, vec)
@@ -146,13 +134,8 @@ end
 function [predAngles,mdl] = modelAndPredictAngle(y,X,idx)
     stableX = X(idx,:);
     stabley = y(idx);
-    
     RegTreeTemp = templateTree('Surrogate','On');
-    mdl = fitensemble(stableX,stabley,'Bag',100,RegTreeTemp,'type','regression'); 
-    
-%     mdl = fitlm(stableX,stabley,'poly88','RobustOpts','on');
-%     mdl = fitlm(X,y,'quadratic','RobustOpts','on');
-
+    mdl = fitensemble(stableX,stabley,'Bag',60,RegTreeTemp,'type','regression'); 
     predAngles = predict(mdl,X);
 end
 
@@ -177,34 +160,7 @@ function figH = makeEyeAnglePupilFigure(anglesLeft,leftEyeX,leftEyeY,anglesRight
     title('Right Eye Theta/Phi with Right Pupil X/Y');
 end
 
-function figH = makePredictionFigure(predAnglesLeft,anglesLeft,predAnglesRight,anglesRight)
-    figH = figure;
-    ax1=subplot(2,2,1);
-    plot(predAnglesLeft(:,1),'LineWidth',4); hold on; plot(anglesLeft(:,1),'LineWidth',4);
-    title('Left Theta Prediction','FontSize',18)
-    legend('Predicted','Actual');
-    ylim([min(anglesLeft(:,1)),max(anglesLeft(:,1))]);
 
-    ax2=subplot(2,2,3);
-    plot(predAnglesLeft(:,2),'LineWidth',4); hold on; plot(anglesLeft(:,2),'LineWidth',4);
-    title('Left Phi Prediction','FontSize',18)
-    legend('Predicted','Actual');
-    ylim([min(anglesLeft(:,2)),max(anglesLeft(:,2))]);
-
-    ax3=subplot(2,2,2);
-    plot(predAnglesRight(:,1),'LineWidth',4); hold on; plot(anglesRight(:,1),'LineWidth',4);
-    title('Right Theta Prediction','FontSize',18)
-    legend('Predicted','Actual');
-    ylim([min(anglesRight(:,1)),max(anglesRight(:,1))]);
-
-    ax4=subplot(2,2,4);
-    plot(predAnglesRight(:,2),'LineWidth',4); hold on; plot(anglesRight(:,2),'LineWidth',4);
-    title('Right Phi Prediction','FontSize',18)
-    legend('Predicted','Actual');
-    ylim([min(anglesRight(:,2)),max(anglesRight(:,2))]);
-    
-    linkaxes([ax1,ax2,ax3,ax4],'xy')
-end
 
 
 end
